@@ -1,11 +1,13 @@
 """Realtime overlay and departure board construction for a station."""
 from __future__ import annotations
 
+import json
 import logging
 import math
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import requests
 from google.transit import gtfs_realtime_pb2
@@ -20,8 +22,9 @@ POLL_INTERVAL_S = 60
 STALE_AFTER_S = 5 * 60
 ROWS_PER_SECTION = 3
 CITY_ROWS = 6  # Roma Street shows one list instead of two sections
-# The 7th line of the Roma Street board is reserved for a message.
-CITY_MESSAGE = "Supervise Children at all Times to Ensure the Safety of your Children"
+# The 7th line of the Roma Street board is reserved for a message; they take turns each minute.
+CITY_MESSAGES_PATH = Path(__file__).with_name("city_messages.json")
+MESSAGE_ROTATE_S = 60
 LOOKAHEAD_S = 4 * 3600
 
 # Queensland has no daylight saving, so a fixed UTC+10 offset is exact for Brisbane.
@@ -147,6 +150,15 @@ def _destination(trip: TripStop) -> str:
     return name
 
 
+def _city_message(now: float) -> str:
+    try:
+        messages = json.loads(CITY_MESSAGES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        log.warning("Cannot read %s: %s", CITY_MESSAGES_PATH.name, exc)
+        return ""
+    return messages[int(now // MESSAGE_ROTATE_S) % len(messages)] if messages else ""
+
+
 def _fmt_time(epoch: int) -> str:
     dt = datetime.fromtimestamp(epoch, BRISBANE)
     return f"{dt.hour % 12 or 12}:{dt.minute:02d}"
@@ -211,7 +223,7 @@ def build_board(
             single_section=True,
             inbound_heading="Service",
             outbound_heading="",
-            message=CITY_MESSAGE,
+            message=_city_message(now),
             inbound=top(sections[True] + sections[False], CITY_ROWS),
             outbound=[],
         )

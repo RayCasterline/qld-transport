@@ -151,25 +151,27 @@ section {
 }
 
 /* NGR pictogram between the Platform and Departs columns (about 50x69px, centred in the row).
-   Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign. */
+   Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign.
+   Both stock icons share one centre line, left of where a 3-digit wait ("148 min") begins. */
 .row .ngr {
   position: absolute;
-  left: 1586px;
+  left: 1547px;
   top: 22px;
   width: 50px;
   height: 68px;
 }
 .row .three-car {
   position: absolute;
-  left: 1577px;
+  left: 1538px;
   top: 22px;
   width: 68px;
   height: 68px;
 }
-.ngr .body, .three-car .body { fill: #e0e0e6; }
+.ngr .body { fill: #fff; }
+.three-car .body { fill: #fff; }
 .ngr .cut { fill: var(--row); }
 .three-car text { fill: var(--row); font-weight: 700; font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
-.ngr .label { fill: #e0e0e6; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
+.ngr .label { fill: #fff; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
 
 /* Reserved 7th line (below six rows) on single-list boards. */
 #message {

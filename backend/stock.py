@@ -14,10 +14,12 @@ code is the last part of the trip ID (e.g. "...-44306-D103" is run D103).
 
 The file is re-read whenever it changes, so edits apply without restarting the server.
 
-Optionally (python -m backend --infer-ngr) a weaker guess fills the gaps: the first character
-of a run code is the train type, and "D" is the only prefix on the Gold Coast/Airport lines
-(NGR territory) and never appears on Ferny Grove or west of Ipswich, so a "D" run is guessed
-to be NGR. It matched 5 of 6 rows on a real sign, so it is off by default.
+Where there are no sightings a weaker guess fills the gaps (python -m backend --no-infer-ngr
+turns it off). The first character of a run code is the train type: "D" is the only prefix on
+the Gold Coast/Airport lines (NGR territory) and never appears on Ferny Grove or west of
+Ipswich, so a "D" run is guessed to be NGR; it matched 7 of 8 sightings. "J" runs (Doomben,
+Rosewood-Ipswich) are guessed to be 3-car sets, which is only supported by a Doomben sign photo.
+Sightings always override the guess.
 
     python -m backend.stock add D880 NGR --source "platform photo"
     python -m backend.stock add D139 IMU --source "platform photo"
@@ -37,10 +39,11 @@ SIGHTINGS_PATH = Path(__file__).with_name("stock_sightings.csv")
 FIELDS = ["run", "stock", "date", "source"]
 STOCK_TYPES = {"NGR", "3CAR", "SMU", "IMU", "EMU", "ICE", "OTHER"}
 NGR_RUN_PREFIXES = {"D"}
+THREE_CAR_RUN_PREFIXES = {"J"}
 MIN_RUN_SIGHTINGS = 1
 MIN_PATTERN_SIGHTINGS = 2
 NGR_FLEET = 75  # six-car sets, units 701-775 (Wikipedia: New Generation Rollingstock)
-USE_RUN_CODE_RULE = False  # set by `python -m backend --infer-ngr`
+USE_RUN_CODE_RULE = True  # cleared by `python -m backend --no-infer-ngr`
 
 _cache: dict = {"mtime": None, "votes": {}}
 
@@ -101,7 +104,7 @@ def sighting_says_ngr(run: str) -> bool | None:
 
 
 def is_ngr(trip_id: str, barred: bool = False) -> bool:
-    """Assume older stock unless sightings (or the opt-in run-code guess) say NGR.
+    """Sightings decide; without one, the run-code guess applies unless --no-infer-ngr.
 
     barred: the trip calls at a station NGRs cannot serve (see gtfs_static.NGR_BARRED_STATIONS).
     """
@@ -115,7 +118,11 @@ def is_ngr(trip_id: str, barred: bool = False) -> bool:
 
 
 def is_three_car(trip_id: str) -> bool:
-    return sighting_says_stock(run_code(trip_id), "3CAR") is True
+    run = run_code(trip_id)
+    seen = sighting_says_stock(run, "3CAR")
+    if seen is not None:
+        return seen
+    return USE_RUN_CODE_RULE and run[:1] in THREE_CAR_RUN_PREFIXES
 
 
 def _append(run: str, stock: str, when: str, source: str) -> None:

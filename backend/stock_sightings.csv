@@ -1,7 +1,7 @@
 # Trainspotter sightings: run code (end of the GTFS trip ID) -> stock actually seen.
-# stock: NGR, SMU, IMU, EMU, ICE, or OTHER (any non-NGR train).
-# Services are assumed to be older stock; the NGR icon shows only for run codes with NGR
-# sightings here (1+ for an exact run, 2+ for a glob such as D1*). The most specific pattern wins.
+# stock: NGR, 3CAR, SMU, IMU, EMU, ICE, or OTHER (any other train).
+# Sightings here override the run-code guess (D... = NGR, J... = 3 car; see backend/stock.py):
+# 1+ for an exact run, 2+ for a glob such as D1*. The most specific pattern wins.
 # Trips on lines NGRs can't serve are never NGR.
 # Add rows by hand or with: python -m backend.stock add D880 NGR --source "..."
 run,stock,date,source

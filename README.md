@@ -40,7 +40,21 @@ To change the default station, use `--station` (a station name, with or without 
 python -m backend --station "Fortitude Valley"
 ```
 
-Sections are split into trains heading to the city (inbound) and away from it (outbound). Northgate keeps the titles from its real sign ("City & South/West" and "North"); other stations use "City" and "Outbound". Roma Street shows a single list of the next 6 trains instead, with the 7th line reserved for a message (`CITY_MESSAGE` in `backend/departures.py`).
+Sections are split into trains heading to the city (inbound) and away from it (outbound). Northgate keeps the titles from its real sign ("City & South/West" and "North"); other stations use "City" and "Outbound". Roma Street shows a single list of the next 6 trains instead, with the 7th line reserved for a scrolling message. The messages are listed in `backend/city_messages.json` and change every minute.
+
+### Adding your own Roma Street messages
+
+Add your own text to the list in `backend/city_messages.json`; it is a plain JSON array of strings:
+
+```json
+[
+  "Supervise Children at all Times to Ensure the Safety of your Children",
+  "Customers, Please Keep Your Possessions With You at all Times",
+  "Your own message here"
+]
+```
+
+The file is read on every request, so changes show up without restarting the server. The sign rotates through the messages in order, one per minute.
 
 ### Options
 
@@ -50,6 +64,7 @@ Sections are split into trains heading to the city (inbound) and away from it (o
 | `--host` | `127.0.0.1` | Interface to bind to. Use `0.0.0.0` to serve other devices on the network. |
 | `--port` | `8731` | Port to listen on. |
 | `--show-attribution` | off | Show the TransLink data attribution / licence line at the bottom of the sign. |
+| `--no-infer-ngr` | off | Stop guessing the train type from the run code (`D` = NGR icon, `J` = 3 CAR icon). With this, only runs listed in `backend/stock_sightings.csv` show an icon. |
 
 Example:
 
