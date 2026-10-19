@@ -8,6 +8,7 @@ const stationInput = document.getElementById("station-input");
 const stationList = document.getElementById("station-list");
 const messageEl = document.getElementById("message");
 const messageText = messageEl.firstElementChild;
+const ngrTemplate = document.getElementById("ngr-icon");
 const MESSAGE_SPEED = 160; // px per second, in the 1920px design canvas
 let messageShown = "";
 
@@ -44,6 +45,7 @@ function renderSection(id, rows) {
     const el = document.createElement("div");
     el.className = "row";
     el.style.background = r.color;
+    el.style.setProperty("--row", r.color);
     el.dataset.departs = r.departs_epoch;
     for (const [cls, text] of [
       ["time", r.scheduled],
@@ -56,6 +58,11 @@ function renderSection(id, rows) {
       span.className = cls;
       span.textContent = text;
       el.appendChild(span);
+      // NGR pictogram sits between the Platform and Departs columns.
+      if (cls === "platform" && r.ngr) {
+        const icon = ngrTemplate.content.firstElementChild.cloneNode(true);
+        el.appendChild(icon);
+      }
     }
     container.appendChild(el);
   }

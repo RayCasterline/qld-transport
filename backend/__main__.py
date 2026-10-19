@@ -1,9 +1,17 @@
 """Entry point: python -m backend [--station NAME] [--port N] [--host H] [--show-attribution]"""
 import argparse
+import socket
+import sys
 
 import uvicorn
 
 from . import app as app_module
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.connect_ex((host, port)) == 0
 
 
 def main() -> None:
@@ -17,6 +25,11 @@ def main() -> None:
         help="show the TransLink data attribution / licence line at the bottom of the sign (hidden by default)",
     )
     args = parser.parse_args()
+    if _port_in_use(args.host, args.port):
+        sys.exit(
+            f"Port {args.port} is already in use (is the sign already running?). "
+            f"Stop it, or pick another port with --port N."
+        )
     app_module.settings["station"] = args.station
     app_module.settings["show_attribution"] = args.show_attribution
     uvicorn.run(app_module.app, host=args.host, port=args.port)

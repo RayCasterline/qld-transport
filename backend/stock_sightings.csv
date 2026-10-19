@@ -1,0 +1,11 @@
+# Trainspotter sightings: run code (end of the GTFS trip ID) -> stock actually seen.
+# stock: NGR, SMU, IMU, EMU, ICE, or OTHER (any non-NGR train).
+# A run code only overrides the "D = NGR" rule once it has 2+ agreeing sightings.
+# Add rows by hand or with: python -m backend.stock add D880 NGR --source "..."
+run,stock,date,source
+D880,NGR,,Northgate sign photo 5:30pm (weekday)
+DK68,NGR,,Northgate sign photo 5:30pm (weekday)
+1882,OTHER,,Northgate sign photo 5:30pm (weekday)
+DA75,NGR,,Northgate sign photo 5:30pm (weekday)
+D139,OTHER,,Northgate sign photo 5:30pm (weekday; possibly a swapped set)
+DY61,NGR,,Northgate sign photo 5:30pm (weekday)

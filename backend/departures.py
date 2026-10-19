@@ -11,6 +11,7 @@ import requests
 from google.transit import gtfs_realtime_pb2
 
 from .gtfs_static import StaticIndex, TripStop
+from .stock import is_ngr
 
 log = logging.getLogger(__name__)
 
@@ -32,9 +33,10 @@ DESTINATION_ALIASES = {"Kippa-Ring": "Redcliffe"}
 # Line colours sampled from the real sign photo (images/QLD RAil.jpeg).
 T1_GREEN = "#3A8014"       # Caboolture / Sunshine Coast / Ipswich
 T2_LIGHT_BLUE = "#4A80E0"  # Redcliffe Peninsula / Springfield: softer cornflower blue as rendered on the sign
-T4_BLUE = "#4A4AE6"        # Shorncliffe / Cleveland: purple-tinted blue as rendered on the sign
+T4_BLUE = "#0101B6"        # Shorncliffe / Cleveland: deep blue sampled from a swatch of the sign
 FERNY_GROVE_RED = "#B81212"  # Ferny Grove / Beenleigh: a pure, slightly dark red (GTFS D53E45 is too muted)
 GOLD_COAST_GOLD = "#8C7A1E"  # Gold Coast / Airport: muted olive-gold as rendered on the sign
+DOOMBEN_PURPLE = "#9A56C2"  # Doomben: purple as rendered on the sign
 # Keyed by the GTFS route_color of each route.
 MAP_COLORS = {
     "27855A": T1_GREEN,
@@ -42,6 +44,7 @@ MAP_COLORS = {
     "4778B2": T4_BLUE,
     "D53E45": FERNY_GROVE_RED,
     "FFC425": GOLD_COAST_GOLD,
+    "9B60A6": DOOMBEN_PURPLE,
 }
 # The Northgate-Shorncliffe shuttle is tagged light blue in GTFS but is part of the T4 line.
 ROUTE_COLOR_OVERRIDES = {"SHSH": T4_BLUE}
@@ -49,6 +52,8 @@ ROUTE_COLOR_OVERRIDES = {"SHSH": T4_BLUE}
 # Section titles as shown on the physical sign, by station: (inbound, outbound).
 SECTION_TITLES = {"Northgate": ("City & South/West", "North")}
 DEFAULT_SECTION_TITLES = ("City", "Outbound")
+
+# Whether a trip is an NGR comes from backend/stock.py (run-code rule + trainspotter sightings).
 
 
 def _line_color(trip: TripStop) -> str:
@@ -174,6 +179,7 @@ def build_board(
                     "scheduled": _fmt_time(scheduled),
                     "destination": _destination(trip),
                     "express": trip.express,
+                    "ngr": is_ngr(trip.trip_id),
                     "platform": platforms.get(stop_id, "-"),
                     "departs_epoch": actual,
                     "minutes": math.floor((actual - now) / 60),

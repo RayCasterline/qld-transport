@@ -113,6 +113,19 @@ section {
 .row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; }
 .row .minutes { position: absolute; right: 12px; }
 
+/* NGR pictogram between the Platform and Departs columns (about 50x69px, centred in the row).
+   Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign. */
+.row .ngr {
+  position: absolute;
+  left: 1569px;
+  top: 22px;
+  width: 50px;
+  height: 68px;
+}
+.ngr .body { fill: #e0e0e6; }
+.ngr .cut { fill: var(--row); }
+.ngr .label { fill: #e0e0e6; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
+
 /* Reserved 7th line (below six rows) on single-list boards. */
 #message {
   position: absolute;
