@@ -1,4 +1,5 @@
-"""Entry point: python -m backend [--station NAME] [--port N] [--host H] [--show-attribution]"""
+"""Entry point: python -m backend [--station NAME] [--port N] [--host H] [--show-attribution]
+[--infer-ngr]"""
 import argparse
 import socket
 import sys
@@ -6,6 +7,7 @@ import sys
 import uvicorn
 
 from . import app as app_module
+from . import stock
 
 
 def _port_in_use(host: str, port: int) -> bool:
@@ -24,6 +26,12 @@ def main() -> None:
         action="store_true",
         help="show the TransLink data attribution / licence line at the bottom of the sign (hidden by default)",
     )
+    parser.add_argument(
+        "--infer-ngr",
+        action="store_true",
+        help="also guess NGR from the run code (D prefix) where there are no sightings; by default only "
+             "services with trainspotter sightings in backend/stock_sightings.csv show the NGR icon",
+    )
     args = parser.parse_args()
     if _port_in_use(args.host, args.port):
         sys.exit(
@@ -32,6 +40,7 @@ def main() -> None:
         )
     app_module.settings["station"] = args.station
     app_module.settings["show_attribution"] = args.show_attribution
+    stock.USE_RUN_CODE_RULE = args.infer_ngr
     uvicorn.run(app_module.app, host=args.host, port=args.port)
 
 

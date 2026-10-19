@@ -20,12 +20,20 @@ STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ZIP_PATH = DATA_DIR / "SEQ_GTFS.zip"
 INDEX_PATH = DATA_DIR / "rail_index.pkl"
-INDEX_VERSION = 4
+INDEX_VERSION = 5
 MAX_ZIP_AGE_S = 24 * 3600
 
 RAIL_ROUTE_TYPE = "2"
 # Trains calling at this station after the sign's station are heading to the city.
 CITY_STATION = "Roma Street"
+
+# NGR sets are not permitted on the Ferny Grove line (platform gap at Newmarket/Keperra, short
+# platforms) or west of Ipswich (platform length at Rosewood). Any trip calling at one of these
+# stations cannot be an NGR, whatever its run code says.
+NGR_BARRED_STATIONS = {
+    "Ferny Grove", "Keperra", "Newmarket",
+    "Wulkuraka", "Karrabin", "Walloon", "Thomas Street", "Rosewood",
+}
 
 
 @dataclass
@@ -125,6 +133,10 @@ class StaticIndex:
         self.calendar_dates = calendar_dates
         self.city_id = next((s.id for s in stations.values() if s.name == CITY_STATION), None)
         self._by_name = {_normalise(s.name): s.id for s in stations.values()}
+        barred_ids = {s.id for s in stations.values() if s.name in NGR_BARRED_STATIONS}
+        self.ngr_barred: set[str] = {
+            t.trip_id for t in trips if any(stop_station[s[1]] in barred_ids for s in t.stops)
+        }
         self._views: dict[str, StationView] = {}
         # station id -> [(trip, index of its first call at that station)]
         self._calls: dict[str, list[tuple[RailTrip, int]]] = defaultdict(list)

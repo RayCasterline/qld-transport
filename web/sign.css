@@ -15,7 +15,9 @@ html, body {
   transform-origin: 0 0;
   background: #111;
   color: #fff;
-  font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  /* The real sign's text is Helvetica/Arial-style bold. Nimbus Sans (a Helvetica clone, which
+     "Helvetica" resolves to on Linux) has a lighter, narrower C than Liberation Sans. */
+  font-family: "Nimbus Sans", "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
   font-weight: 700;
   box-sizing: border-box;
   padding: 0 14px;
@@ -80,7 +82,7 @@ section {
 .section-head {
   position: relative;
   height: 73px;
-  font-size: 52px;
+  font-size: 53px;
   line-height: 80px;
 }
 
@@ -102,22 +104,24 @@ section {
   position: relative;
   height: 112px;
   margin-bottom: 9px;
-  font-size: 72px;
-  line-height: 112px;
+  font-size: 67px;
+  line-height: 122px;  /* taller than the 112px row so the text sits 5px lower in the bar */
   white-space: nowrap;
 }
 
-.row .time { position: absolute; left: 0; width: 190px; font-variant-numeric: tabular-nums; }
-.row .dest { position: absolute; left: 195px; }
+/* Sizes measured from the reference photo: row text digits are ~0.42 of the row height, the
+   platform digits ~0.54, and the destination is set slightly wider than the font's default. */
+.row .time { position: absolute; left: 8px; width: 190px; font-variant-numeric: tabular-nums; }
+.row .dest { position: absolute; left: 250px; letter-spacing: 0.02em; }
 .row .exp { position: absolute; left: 1180px; }
-.row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; }
+.row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; font-size: 84px; }
 .row .minutes { position: absolute; right: 12px; }
 
 /* NGR pictogram between the Platform and Departs columns (about 50x69px, centred in the row).
    Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign. */
 .row .ngr {
   position: absolute;
-  left: 1569px;
+  left: 1586px;
   top: 22px;
   width: 50px;
   height: 68px;
@@ -142,13 +146,14 @@ section {
 #message .track { display: inline-block; }
 #message .item { display: inline-block; padding-right: 240px; }
 
-/* Ticker: starts left-aligned, pauses, then scrolls left; the repeated copy follows it in.
-   sign.js sets --to (minus one item's width) and --dur. */
+/* Ticker: scrolls left at a constant speed; the repeated copies follow it in, so it loops
+   continuously. sign.js sets --to (minus one item's width) and --dur. */
+#message .track { will-change: transform; }
 #message .track.scroll { animation: marquee var(--dur) linear infinite; }
 
 @keyframes marquee {
-  0%, 12% { transform: translateX(0); }
-  100% { transform: translateX(var(--to)); }
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--to)); }
 }
 
 #status {

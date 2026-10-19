@@ -91,16 +91,22 @@ function setMessage(text) {
   messageText.classList.remove("scroll");
   messageText.replaceChildren();
   if (!text) return;
-  // Two copies back to back, so the text loops seamlessly.
-  for (let i = 0; i < 2; i++) {
+  // Repeat the text back to back until it covers the bar plus one spare copy, so the loop is
+  // seamless and the bar never runs empty, however short the message is.
+  const addItem = () => {
     const item = document.createElement("span");
     item.className = "item";
     item.textContent = text;
     messageText.appendChild(item);
-  }
-  const width = messageText.offsetWidth / 2;  // one copy, including its trailing gap
+    return item;
+  };
+  const first = addItem();
+  const width = first.offsetWidth;  // one copy, including its gap (layout px, unaffected by scaling)
+  if (!width) return;
+  const needed = Math.ceil(messageEl.clientWidth / width) + 1;
+  for (let i = 1; i < needed; i++) addItem();
   messageText.style.setProperty("--to", `-${width}px`);
-  messageText.style.setProperty("--dur", `${width / MESSAGE_SPEED / 0.88}s`);  // 12% of the cycle is the pause
+  messageText.style.setProperty("--dur", `${width / MESSAGE_SPEED}s`);  // constant speed, no pause
   messageText.classList.add("scroll");
 }
 

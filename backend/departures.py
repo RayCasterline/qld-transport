@@ -179,7 +179,7 @@ def build_board(
                     "scheduled": _fmt_time(scheduled),
                     "destination": _destination(trip),
                     "express": trip.express,
-                    "ngr": is_ngr(trip.trip_id),
+                    "ngr": is_ngr(trip.trip_id, trip.trip_id in index.ngr_barred),
                     "platform": platforms.get(stop_id, "-"),
                     "departs_epoch": actual,
                     "minutes": math.floor((actual - now) / 60),
