@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Station sign</title>
+  <link rel="stylesheet" href="sign.css">
+</head>
+<body>
+  <div id="stage">
+    <header>
+      <div id="clock">--:--:--</div>
+      <div id="title">Next 3 Inbound and Outbound Trains</div>
+      <div id="station-picker">
+        <input id="station-input" list="station-list" placeholder="Search station"
+               autocomplete="off" spellcheck="false" aria-label="Station">
+        <datalist id="station-list"></datalist>
+      </div>
+    </header>
+
+    <section id="inbound">
+      <div class="section-head">
+        <span class="name"></span>
+        <span class="col-platform">Platform</span>
+        <span class="col-departs">Departs</span>
+      </div>
+      <div class="rows"></div>
+    </section>
+
+    <section id="outbound">
+      <div class="section-head">
+        <span class="name"></span>
+        <span class="col-platform">Platform</span>
+        <span class="col-departs">Departs</span>
+      </div>
+      <div class="rows"></div>
+    </section>
+
+    <div id="message"><div class="track"></div></div>
+    <footer id="status"></footer>
+  </div>
+  <script src="sign.js"></script>
+</body>
+</html>

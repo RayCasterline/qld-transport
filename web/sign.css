@@ -1,0 +1,153 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+}
+
+/* Fixed 1920x1080 design canvas, scaled to the window by sign.js. */
+#stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  background: #111;
+  color: #fff;
+  font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  font-weight: 700;
+  box-sizing: border-box;
+  padding: 0 14px;
+}
+
+header {
+  position: relative;
+  height: 117px;
+}
+
+#clock {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  font-size: 64px;
+  color: #f2e53a;
+  font-variant-numeric: tabular-nums;
+}
+
+#title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  text-align: center;
+  font-size: 60px;
+  padding-left: 40px;
+}
+
+#station-picker {
+  position: absolute;
+  right: 0;
+  top: 14px;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+
+#station-picker:hover,
+#station-picker:focus-within { opacity: 1; }
+
+#station-input {
+  width: 340px;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 32px;
+  font-weight: 400;
+  color: #fff;
+  background: #222;
+  border: 2px solid #555;
+  border-radius: 6px;
+}
+
+#station-input:focus { outline: none; border-color: #f2e53a; }
+
+/* Row-to-row pitch between sections (489px) and header spacing measured from images/QLD RAil.jpeg. */
+section {
+  position: relative;
+  height: 489px;
+}
+
+.section-head {
+  position: relative;
+  height: 73px;
+  font-size: 52px;
+  line-height: 80px;
+}
+
+.section-head .col-platform {
+  position: absolute;
+  left: 1350px;
+  width: 250px;
+  text-align: center;
+}
+
+.section-head .col-departs {
+  position: absolute;
+  right: 0;
+  width: 230px;
+  text-align: center;
+}
+
+.row {
+  position: relative;
+  height: 112px;
+  margin-bottom: 9px;
+  font-size: 72px;
+  line-height: 112px;
+  white-space: nowrap;
+}
+
+.row .time { position: absolute; left: 0; width: 190px; font-variant-numeric: tabular-nums; }
+.row .dest { position: absolute; left: 195px; }
+.row .exp { position: absolute; left: 1180px; }
+.row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; }
+.row .minutes { position: absolute; right: 12px; }
+
+/* Reserved 7th line (below six rows) on single-list boards. */
+#message {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 916px;
+  height: 112px;
+  font-size: 58px;
+  line-height: 112px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#message .track { display: inline-block; }
+#message .item { display: inline-block; padding-right: 240px; }
+
+/* Ticker: starts left-aligned, pauses, then scrolls left; the repeated copy follows it in.
+   sign.js sets --to (minus one item's width) and --dur. */
+#message .track.scroll { animation: marquee var(--dur) linear infinite; }
+
+@keyframes marquee {
+  0%, 12% { transform: translateX(0); }
+  100% { transform: translateX(var(--to)); }
+}
+
+#status {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 6px;
+  font-size: 18px;
+  font-weight: 400;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+}
+
+#status .warn { color: #ff6a3d; }
