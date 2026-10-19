@@ -51,6 +51,7 @@ header {
   position: absolute;
   right: 0;
   top: 14px;
+  z-index: 10;
   opacity: 0.35;
   transition: opacity 0.2s;
 }
@@ -72,6 +73,29 @@ header {
 }
 
 #station-input:focus { outline: none; border-color: #f2e53a; }
+
+#station-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 340px;
+  max-height: 600px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 32px;
+  font-weight: 400;
+  background: #222;
+  border: 2px solid #555;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+#station-menu li { padding: 6px 12px; cursor: pointer; }
+#station-menu li.active,
+#station-menu li:hover { background: #444; }
 
 /* Row-to-row pitch between sections (489px) and header spacing measured from images/QLD RAil.jpeg. */
 section {
@@ -116,6 +140,15 @@ section {
 .row .exp { position: absolute; left: 1180px; }
 .row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; font-size: 84px; }
 .row .minutes { position: absolute; right: 12px; }
+.airport-icon {
+  display: inline-block;
+  width: 92px;
+  height: 92px;
+  margin-left: 6px;
+  vertical-align: -26px;
+  transform: rotate(90deg);
+  color: #fff;
+}
 
 /* NGR pictogram between the Platform and Departs columns (about 50x69px, centred in the row).
    Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign. */
@@ -126,8 +159,16 @@ section {
   width: 50px;
   height: 68px;
 }
-.ngr .body { fill: #e0e0e6; }
+.row .three-car {
+  position: absolute;
+  left: 1577px;
+  top: 22px;
+  width: 68px;
+  height: 68px;
+}
+.ngr .body, .three-car .body { fill: #e0e0e6; }
 .ngr .cut { fill: var(--row); }
+.three-car text { fill: var(--row); font-weight: 700; font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
 .ngr .label { fill: #e0e0e6; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
 
 /* Reserved 7th line (below six rows) on single-list boards. */

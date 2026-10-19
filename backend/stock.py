@@ -1,7 +1,7 @@
 """NGR (New Generation Rollingstock) lookup built from trainspotter sightings.
 
 The GTFS feeds do not say what stock runs a service, so a service is assumed to be older
-stock (SMU/IMU) unless there is good evidence it is an NGR. The evidence is the sightings in
+stock unless there is good evidence about it. The evidence is the sightings in
 backend/stock_sightings.csv: each row says "run code X was seen to be stock Y", where the run
 code is the last part of the trip ID (e.g. "...-44306-D103" is run D103).
 
@@ -35,7 +35,7 @@ from pathlib import Path
 
 SIGHTINGS_PATH = Path(__file__).with_name("stock_sightings.csv")
 FIELDS = ["run", "stock", "date", "source"]
-STOCK_TYPES = {"NGR", "SMU", "IMU", "EMU", "ICE", "OTHER"}  # anything but NGR means "not NGR"
+STOCK_TYPES = {"NGR", "3CAR", "SMU", "IMU", "EMU", "ICE", "OTHER"}
 NGR_RUN_PREFIXES = {"D"}
 MIN_RUN_SIGHTINGS = 1
 MIN_PATTERN_SIGHTINGS = 2
@@ -67,7 +67,7 @@ def _votes() -> dict[str, Counter]:
         for row in _read_rows(SIGHTINGS_PATH):
             run, stock = (row.get("run") or "").strip().upper(), (row.get("stock") or "").strip().upper()
             if run and stock in STOCK_TYPES:
-                votes[run]["NGR" if stock == "NGR" else "OTHER"] += 1
+                votes[run][stock] += 1
         _cache.update(mtime=mtime, votes=dict(votes))
     return _cache["votes"]
 
@@ -76,8 +76,8 @@ def rule_says_ngr(run: str) -> bool:
     return run[:1] in NGR_RUN_PREFIXES
 
 
-def sighting_says_ngr(run: str) -> bool | None:
-    """True/False when enough sightings exist, otherwise None.
+def sighting_says_stock(run: str, stock: str) -> bool | None:
+    """Whether sightings identify this stock; return None when evidence is tied or insufficient.
 
     Of the patterns matching this run code, the most specific one (most literal characters,
     so an exact code beats "D1*") that has enough sightings and no tie decides.
@@ -87,13 +87,17 @@ def sighting_says_ngr(run: str) -> bool | None:
         total = sum(c.values())
         is_glob = any(ch in pattern for ch in "*?[")
         needed = MIN_PATTERN_SIGHTINGS if is_glob else MIN_RUN_SIGHTINGS
-        if total < needed or c["NGR"] == c["OTHER"] or not fnmatchcase(run, pattern):
+        if total < needed or c[stock] * 2 == total or not fnmatchcase(run, pattern):
             continue
         specificity = sum(ch not in "*?[]" for ch in pattern)
-        candidate = (specificity, total, c["NGR"] > c["OTHER"])
+        candidate = (specificity, total, c[stock] * 2 > total)
         if best is None or candidate[:2] > best[:2]:
             best = candidate
     return None if best is None else best[2]
+
+
+def sighting_says_ngr(run: str) -> bool | None:
+    return sighting_says_stock(run, "NGR")
 
 
 def is_ngr(trip_id: str, barred: bool = False) -> bool:
@@ -108,6 +112,10 @@ def is_ngr(trip_id: str, barred: bool = False) -> bool:
     if seen is not None:
         return seen
     return USE_RUN_CODE_RULE and rule_says_ngr(run)
+
+
+def is_three_car(trip_id: str) -> bool:
+    return sighting_says_stock(run_code(trip_id), "3CAR") is True
 
 
 def _append(run: str, stock: str, when: str, source: str) -> None:
@@ -149,7 +157,7 @@ def _sign(args: argparse.Namespace) -> None:
         if len(parts) < 2:
             raise SystemExit(f"row must be 'H:MM PLATFORM [NGR|-] [DESTINATION]', got {raw!r}")
         shown, platform = parts[0], parts[1]
-        stock = "NGR" if len(parts) > 2 and parts[2].upper() == "NGR" else "OTHER"
+        stock = parts[2].upper() if len(parts) > 2 and parts[2].upper() in STOCK_TYPES else "OTHER"
         dest = " ".join(parts[3:]).lower()
         found = {
             run_code(t.trip_id): t.headsign for t in view.trips
@@ -223,7 +231,7 @@ def main() -> None:
     sub = parser.add_subparsers(required=True)
     add = sub.add_parser("add", help="record a sighting")
     add.add_argument("run", help="run code, e.g. D880 (the end of the trip ID)")
-    add.add_argument("stock", help="NGR, SMU, IMU, EMU, ICE or OTHER")
+    add.add_argument("stock", help="NGR, 3CAR, SMU, IMU, EMU, ICE or OTHER")
     add.add_argument("--date", help="YYYY-MM-DD (default today)")
     add.add_argument("--source", help="where the sighting came from")
     add.set_defaults(func=_add)
@@ -231,7 +239,7 @@ def main() -> None:
         "sign", help="turn the rows of a real sign into sightings, e.g. sign --station Northgate "
                      "--date 2026-10-19 --time 17:30 '5:42 1 NGR Cleveland' '5:57 1 - Cleveland' --save")
     sign.add_argument("rows", nargs="+",
-                      help="'H:MM PLATFORM NGR|- [DESTINATION]': NGR if the icon is shown, - if not; "
+                      help="'H:MM PLATFORM NGR|3CAR|- [DESTINATION]': identify the stock icon, - if none; "
                            "the destination word is needed when two trains share a time and platform")
     sign.add_argument("--station", required=True)
     sign.add_argument("--date", help="YYYY-MM-DD the sign was photographed (default today)")

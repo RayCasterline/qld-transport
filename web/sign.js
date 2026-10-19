@@ -5,10 +5,12 @@ const clockEl = document.getElementById("clock");
 const statusEl = document.getElementById("status");
 const stage = document.getElementById("stage");
 const stationInput = document.getElementById("station-input");
-const stationList = document.getElementById("station-list");
+const stationMenu = document.getElementById("station-menu");
 const messageEl = document.getElementById("message");
 const messageText = messageEl.firstElementChild;
 const ngrTemplate = document.getElementById("ngr-icon");
+const threeCarTemplate = document.getElementById("three-car-icon");
+const airportTemplate = document.getElementById("airport-icon");
 const MESSAGE_SPEED = 160; // px per second, in the 1920px design canvas
 let messageShown = "";
 
@@ -57,11 +59,16 @@ function renderSection(id, rows) {
       const span = document.createElement("span");
       span.className = cls;
       span.textContent = text;
+      if (cls === "dest" && r.destination.endsWith("Airport")) {
+        span.appendChild(airportTemplate.content.firstElementChild.cloneNode(true));
+      }
       el.appendChild(span);
       // NGR pictogram sits between the Platform and Departs columns.
-      if (cls === "platform" && r.ngr) {
-        const icon = ngrTemplate.content.firstElementChild.cloneNode(true);
-        el.appendChild(icon);
+      if (cls === "platform") {
+        const stockTemplate = r.three_car ? threeCarTemplate : r.ngr ? ngrTemplate : null;
+        if (stockTemplate) {
+          el.appendChild(stockTemplate.content.firstElementChild.cloneNode(true));
+        }
       }
     }
     container.appendChild(el);
@@ -176,19 +183,66 @@ async function loadStations() {
     const data = await res.json();
     for (const s of data.stations) {
       stationIds.set(s.name.toLowerCase(), s.id);
-      const option = document.createElement("option");
-      option.value = s.name;
-      stationList.appendChild(option);
+      stationNames.push(s.name);
     }
   } catch {
     // the sign still works without the search box
   }
 }
 
-stationInput.addEventListener("focus", () => stationInput.select());
-stationInput.addEventListener("input", () => applyStationInput(false));
-stationInput.addEventListener("change", () => applyStationInput(true));
-stationInput.addEventListener("keydown", (e) => { if (e.key === "Enter") stationInput.blur(); });
+// The native datalist popup is misplaced inside the scaled stage, so the menu is drawn in the page.
+const stationNames = [];
+let menuItems = [];
+let menuIndex = -1;
+
+function showMenu() {
+  const q = stationInput.value.trim().toLowerCase();
+  menuItems = stationNames.filter((n) => n.toLowerCase().includes(q));
+  menuIndex = -1;
+  stationMenu.replaceChildren(...menuItems.map((name) => {
+    const li = document.createElement("li");
+    li.textContent = name;
+    return li;
+  }));
+  stationMenu.hidden = menuItems.length === 0;
+}
+
+function highlight(i) {
+  stationMenu.children[menuIndex]?.classList.remove("active");
+  menuIndex = i;
+  const li = stationMenu.children[i];
+  li?.classList.add("active");
+  li?.scrollIntoView({ block: "nearest" });
+}
+
+function chooseStation(name) {
+  stationInput.value = name;
+  stationInput.blur();
+}
+
+// Keep focus in the input while the menu is clicked so blur does not close it first.
+stationMenu.addEventListener("mousedown", (e) => e.preventDefault());
+stationMenu.addEventListener("click", (e) => {
+  if (e.target.tagName === "LI") chooseStation(e.target.textContent);
+});
+
+stationInput.addEventListener("focus", () => { stationInput.value = ""; showMenu(); });
+stationInput.addEventListener("blur", () => { stationMenu.hidden = true; applyStationInput(true); });
+stationInput.addEventListener("input", showMenu);
+stationInput.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const step = e.key === "ArrowDown" ? 1 : -1;
+    highlight((menuIndex + step + menuItems.length) % menuItems.length);
+  } else if (e.key === "Enter") {
+    const typed = stationInput.value.trim().toLowerCase();
+    const exact = menuItems.find((n) => n.toLowerCase() === typed);
+    const pick = menuItems[menuIndex] ?? exact ?? menuItems[0];
+    if (pick) chooseStation(pick); else stationInput.blur();
+  } else if (e.key === "Escape") {
+    stationInput.blur();
+  }
+});
 
 // Refresh on every minute boundary (plus a small offset), i.e. 1-minute resolution.
 function scheduleNext() {

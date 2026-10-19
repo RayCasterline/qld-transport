@@ -11,7 +11,7 @@ import requests
 from google.transit import gtfs_realtime_pb2
 
 from .gtfs_static import StaticIndex, TripStop
-from .stock import is_ngr
+from .stock import is_ngr, is_three_car
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ T4_BLUE = "#0101B6"        # Shorncliffe / Cleveland: deep blue sampled from a s
 FERNY_GROVE_RED = "#B81212"  # Ferny Grove / Beenleigh: a pure, slightly dark red (GTFS D53E45 is too muted)
 GOLD_COAST_GOLD = "#8C7A1E"  # Gold Coast / Airport: muted olive-gold as rendered on the sign
 DOOMBEN_PURPLE = "#9A56C2"  # Doomben: purple as rendered on the sign
+BOWEN_HILLS_GRAY = "#888888"
 # Keyed by the GTFS route_color of each route.
 MAP_COLORS = {
     "27855A": T1_GREEN,
@@ -57,6 +58,8 @@ DEFAULT_SECTION_TITLES = ("City", "Outbound")
 
 
 def _line_color(trip: TripStop) -> str:
+    if trip.headsign.removesuffix(" station") == "Bowen Hills":
+        return BOWEN_HILLS_GRAY
     return ROUTE_COLOR_OVERRIDES.get(trip.route_short) or MAP_COLORS.get(trip.color.upper()) or "#" + trip.color
 
 CANCELED = gtfs_realtime_pb2.TripDescriptor.CANCELED
@@ -180,6 +183,7 @@ def build_board(
                     "destination": _destination(trip),
                     "express": trip.express,
                     "ngr": is_ngr(trip.trip_id, trip.trip_id in index.ngr_barred),
+                    "three_car": is_three_car(trip.trip_id),
                     "platform": platforms.get(stop_id, "-"),
                     "departs_epoch": actual,
                     "minutes": math.floor((actual - now) / 60),
