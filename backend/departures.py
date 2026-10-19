@@ -31,8 +31,8 @@ DESTINATION_ALIASES = {"Kippa-Ring": "Redcliffe"}
 
 # Line colours sampled from the real sign photo (images/QLD RAil.jpeg).
 T1_GREEN = "#3A8014"       # Caboolture / Sunshine Coast / Ipswich
-T2_LIGHT_BLUE = "#0F5FE0"  # Redcliffe Peninsula / Springfield (as rendered on the sign)
-T4_BLUE = "#4A42E0"        # Shorncliffe / Cleveland: purple-tinted blue as rendered on the sign
+T2_LIGHT_BLUE = "#4A80E0"  # Redcliffe Peninsula / Springfield: softer cornflower blue as rendered on the sign
+T4_BLUE = "#4A4AE6"        # Shorncliffe / Cleveland: purple-tinted blue as rendered on the sign
 FERNY_GROVE_RED = "#B81212"  # Ferny Grove / Beenleigh: a pure, slightly dark red (GTFS D53E45 is too muted)
 GOLD_COAST_GOLD = "#8C7A1E"  # Gold Coast / Airport: muted olive-gold as rendered on the sign
 # Keyed by the GTFS route_color of each route.
