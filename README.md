@@ -2,6 +2,16 @@
 
 A live departure board for any South East Queensland rail station, built from the TransLink GTFS static and GTFS-realtime feeds. A FastAPI backend serves the sign page (`web/`) and a JSON API (`/api/stations`, `/api/departures`). The default station is Northgate, styled after its real sign.
 
+## Examples
+
+Roma Street shows a single list of the next 6 trains, with a scrolling message on the last line:
+
+![Roma Street](docs/roma-street.png)
+
+Other stations, such as Ipswich, show trains to the city and trains away from it:
+
+![Ipswich](docs/ipswich.png)
+
 ## Setup
 
 ```bash
