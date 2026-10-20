@@ -196,12 +196,6 @@ function setMessage(text) {
 }
 
 function render() {
-  // Leave the screens alone while a transition is running; the data is shown when it ends.
-  if (wiping) {
-    renderPending = true;
-    return;
-  }
-  renderPending = false;
   setMessage(board ? board.message : "");
   renderSection("inbound", board ? board.inbound : []);
   renderSection("outbound", board ? board.outbound : []);
@@ -213,7 +207,7 @@ function render() {
   routeEl.hidden = !showRoute;
   document.getElementById("route-departs").hidden = !showRoute;
   stage.classList.toggle("route-view", showRoute);
-  if (showRoute) renderRoute(routeTrain);
+  if (showRoute && !wiping) renderRoute(routeTrain);  // stops stay as they were when the wipe began
   if (board) {
     document.getElementById("title").textContent = showRoute ? board.route_title : board.title;
     document.getElementById("inbound").hidden = showRoute;
@@ -283,7 +277,6 @@ function applyStationInput(revertIfUnknown) {
 // yellow line, so the incoming screen (rendered underneath) is revealed as the line moves down.
 let wiping = false;
 let wipeLayer = null;
-let renderPending = false;
 
 function cancelWipe() {
   wipeLayer?.remove();
@@ -311,7 +304,6 @@ function wipeTo(change) {
   const done = () => {
     if (wipeLayer !== layer) return;  // already finished or cancelled
     cancelWipe();
-    if (renderPending) render();  // data that arrived mid-wipe
   };
   layer.addEventListener("animationend", (e) => { if (e.target === layer) done(); });
   setTimeout(done, WIPE_MS + 500);
