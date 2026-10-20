@@ -73,12 +73,12 @@ def stations() -> dict:
 
 
 @app.get("/api/departures")
-def departures(station: str | None = None) -> dict:
+def departures(station: str | None = None, platform: str | None = None) -> dict:
     index = state["index"]
     station_id = index.find_station(station) if station else state["default_station"]
     if station_id is None:
         raise HTTPException(status_code=404, detail=f"Unknown station: {station}")
-    board = build_board(index, rt_cache, station_id)
+    board = build_board(index, rt_cache, station_id, platform=platform)
     board["show_attribution"] = settings["show_attribution"]
     return board
 

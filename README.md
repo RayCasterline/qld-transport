@@ -56,6 +56,8 @@ Add your own text to the list in `backend/city_messages.json`; it is a plain JSO
 
 The file is read on every request, so changes show up without restarting the server. The sign rotates through the messages in order, one per minute.
 
+The platform box next to the station box limits the board to one platform (`-` shows all). It then lists the next 6 trains in the direction that platform serves (so Northgate platform 3 also lists platform 1 trains; city platforms list only their own) and, every 20 seconds, switches to the stops of the next train calling at that platform, on its line colour (two columns with larger text when the stops fit, otherwise three), with a 2-second wipe (a thin yellow line moving down the screen) between the two pages. The choice is stored in the URL as `&platform=3`, and the API accepts `/api/departures?station=...&platform=3`. Both boxes fade out when the mouse has not moved for a few seconds.
+
 ### Options
 
 | Option | Default | Description |

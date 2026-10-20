@@ -47,24 +47,64 @@ header {
   padding-left: 40px;
 }
 
-#station-picker {
+#route-departs {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  font-size: 60px;
+}
+
+/* Platform stops page: "Departs" takes the top-right corner, so the pickers step left of it. */
+#stage.route-view #pickers { right: 260px; }
+
+#pickers {
   position: absolute;
   right: 0;
   top: 14px;
   z-index: 10;
-  opacity: 0.35;
-  transition: opacity 0.2s;
+  display: flex;
+  gap: 12px;
 }
 
+#station-picker,
+#platform-picker {
+  position: relative;
+  opacity: 0.35;
+  transition: opacity 0.6s;
+}
+
+/* Hidden once the mouse has been still for a few seconds (sign.js toggles .idle). */
+#pickers.idle #station-picker:not(:focus-within),
+#pickers.idle #platform-picker:not(:focus-within) { opacity: 0; }
+
 #station-picker:hover,
-#station-picker:focus-within { opacity: 1; }
+#station-picker:focus-within,
+#platform-picker:hover,
+#platform-picker:focus-within { opacity: 1; }
+
+#platform-button {
+  width: 56px;
+  box-sizing: border-box;
+  padding: 6px 0;
+  font: inherit;
+  font-size: 26px;
+  font-weight: 400;
+  text-align: center;
+  color: #fff;
+  background: #222;
+  border: 2px solid #555;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#platform-button:focus { outline: none; border-color: #f2e53a; }
 
 #station-input {
-  width: 340px;
+  width: 220px;
   box-sizing: border-box;
   padding: 6px 12px;
   font: inherit;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 400;
   color: #fff;
   background: #222;
@@ -74,7 +114,8 @@ header {
 
 #station-input:focus { outline: none; border-color: #f2e53a; }
 
-#station-menu {
+#station-menu,
+#platform-menu {
   position: absolute;
   right: 0;
   top: 100%;
@@ -93,9 +134,15 @@ header {
   z-index: 10;
 }
 
-#station-menu li { padding: 6px 12px; cursor: pointer; }
+#platform-menu { width: 56px; }
+#platform-menu li { text-align: center; padding-left: 0; padding-right: 0; }
+
+#station-menu li,
+#platform-menu li { padding: 6px 12px; cursor: pointer; }
 #station-menu li.active,
-#station-menu li:hover { background: #444; }
+#station-menu li:hover,
+#platform-menu li.active,
+#platform-menu li:hover { background: #444; }
 
 /* Row-to-row pitch between sections (489px) and header spacing measured from images/QLD RAil.jpeg. */
 section {
@@ -153,14 +200,16 @@ section {
 /* NGR pictogram between the Platform and Departs columns (about 50x69px, centred in the row).
    Its viewBox uses coordinates traced from the reference photo, so proportions match the real sign.
    Both stock icons share one centre line, left of where a 3-digit wait ("148 min") begins. */
-.row .ngr {
+.row .ngr,
+.route-row .ngr {
   position: absolute;
   left: 1547px;
   top: 22px;
   width: 50px;
   height: 68px;
 }
-.row .three-car {
+.row .three-car,
+.route-row .three-car {
   position: absolute;
   left: 1538px;
   top: 22px;
@@ -172,6 +221,63 @@ section {
 .ngr .cut { fill: var(--row); }
 .three-car text { fill: var(--row); font-weight: 700; font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
 .ngr .label { fill: #fff; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
+
+/* Platform view, second page: the next train's calling pattern on its line colour. */
+#route { height: 802px; }
+#route .route-body { height: 790px; }
+#route .route-row {
+  position: relative;
+  height: 112px;
+  font-size: 67px;
+  line-height: 122px;
+  white-space: nowrap;
+  border-bottom: 3px solid #fff;
+}
+#route .route-row .minutes { position: absolute; right: 12px; }
+#route .route-row .svc { position: absolute; left: 8px; }
+#route .stops {
+  column-count: 3;
+  column-gap: 40px;
+  padding: 36px 0 0 60px;
+  font-weight: 700;
+}
+#route .stop { break-inside: avoid; white-space: nowrap; }
+#route .stop .exp-note { display: block; padding-left: 1.4em; }
+
+/* Page transition on platform boards: see wipeTo() in sign.js. */
+.wipe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0 14px;
+  background: #111;
+  z-index: 5;
+  pointer-events: none;
+  animation: wipe-away 2s linear forwards;
+}
+
+.wipe-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 6px;
+  background: #f2e53a;
+  animation: wipe-line 2s linear forwards;
+}
+
+@keyframes wipe-away {
+  from { clip-path: inset(0 0 0 0); }
+  to { clip-path: inset(100% 0 0 0); }
+}
+
+@keyframes wipe-line {
+  from { top: 0; }
+  to { top: 100%; }
+}
 
 /* Reserved 7th line (below six rows) on single-list boards. */
 #message {
