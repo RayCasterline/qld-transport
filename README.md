@@ -15,11 +15,15 @@ A live departure board for any South East Queensland rail station, built from th
 
 ## Examples
 
-Northgate, the default station, shows the next 3 trains to the city and the next 3 to the north, with NGR and 3 CAR icons:
+Northgate, the default station, shows the next 3 trains to the city and the next 3 to the north, with NGR icons:
 
 ![Northgate](docs/northgate.png)
 
-Roma Street shows a single list of the next 6 trains, including Domestic Airport services, with a scrolling message on the last line:
+Albion shows the NGR icon, the 3 CAR icon (Doomben and city services) and the aeroplane after a Domestic Airport destination:
+
+![Albion](docs/albion.png)
+
+Roma Street shows a single list of the next 6 trains, with a scrolling message on the last line:
 
 ![Roma Street](docs/roma-street.png)
 
