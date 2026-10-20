@@ -94,6 +94,19 @@ header {
 }
 
 #station-menu li { padding: 6px 12px; cursor: pointer; }
+#station-menu .tag {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  vertical-align: 3px;
+  border-radius: 4px;
+  background: #555;
+}
+#station-menu .tag.bus { background: #007c89; }  /* BUS_COLOR in backend/departures.py */
+#station-menu .code { margin-left: 10px; font-size: 22px; color: #aaa; }
 #station-menu li.active,
 #station-menu li:hover { background: #444; }
 
@@ -140,6 +153,31 @@ section {
 .row .exp { position: absolute; left: 1180px; }
 .row .platform { position: absolute; left: 1350px; width: 250px; text-align: center; font-size: 84px; }
 .row .minutes { position: absolute; right: 12px; }
+
+/* Bus rows: the route number sits in a white badge (text in the row colour) before the
+   destination, which is clipped rather than allowed to run into the Stop column. */
+.row .route {
+  position: absolute;
+  left: 230px;
+  top: 16px;
+  width: 200px;
+  height: 80px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--row);
+  font-size: 62px;
+  line-height: 80px;
+  text-align: center;
+  overflow: hidden;
+}
+.row.bus .platform { font-size: 56px; }  /* stop codes are up to six digits */
+.row.bus .dest {
+  left: 460px;
+  width: 860px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .airport-icon {
   display: inline-block;
   width: 92px;

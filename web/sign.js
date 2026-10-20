@@ -16,8 +16,9 @@ let messageShown = "";
 
 let board = null;
 let fetchOk = false;
-let stationId = new URLSearchParams(location.search).get("station"); // null = server default
-const stationIds = new Map(); // lower-case station name -> id
+// null = server default. ?stop= takes an id, bus stop code or name; ?station= is the older form.
+const startParams = new URLSearchParams(location.search);
+let stationId = startParams.get("stop") ?? startParams.get("station");
 
 const clockFmt = new Intl.DateTimeFormat("en-AU", {
   timeZone: TZ, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
@@ -42,18 +43,20 @@ function minutesText(departsEpoch) {
 
 function renderSection(id, rows) {
   const container = document.querySelector(`#${id} .rows`);
+  const bus = board?.mode === "bus";
   container.replaceChildren();
   for (const r of rows) {
     const el = document.createElement("div");
-    el.className = "row";
+    el.className = bus ? "row bus" : "row";
     el.style.background = r.color;
     el.style.setProperty("--row", r.color);
     el.dataset.departs = r.departs_epoch;
     for (const [cls, text] of [
       ["time", r.scheduled],
+      ...(bus ? [["route", r.route]] : []),  // bus route number, in a badge before the destination
       ["dest", r.destination],
       ["exp", r.express ? "Exp" : ""],
-      ["platform", r.platform],
+      ["platform", r.platform],  // platform for trains, stop code for buses
       ["minutes", minutesText(r.departs_epoch)],
     ]) {
       const span = document.createElement("span");
@@ -126,7 +129,10 @@ function render() {
     document.getElementById("outbound").hidden = board.single_section;
     document.querySelector("#inbound .name").textContent = board.inbound_heading;
     document.querySelector("#outbound .name").textContent = board.outbound_heading;
-    document.title = `${board.station} Station`;
+    document.title = `${board.station} ${board.kind_label ?? "Station"}`;
+    for (const el of document.querySelectorAll(".col-platform")) {
+      el.textContent = board.platform_heading ?? "Platform";
+    }
     if (document.activeElement !== stationInput) stationInput.value = board.station;
   }
   renderStatus();
@@ -142,7 +148,7 @@ function updateCountdowns() {
 async function load() {
   const requested = stationId;
   try {
-    const query = requested ? `?station=${encodeURIComponent(requested)}` : "";
+    const query = requested ? `?stop=${encodeURIComponent(requested)}` : "";
     const res = await fetch(`/api/departures${query}`, { cache: "no-store" });
     if (res.status === 404 && requested) {  // unknown station: fall back to the default
       stationId = null;
@@ -160,51 +166,66 @@ async function load() {
   render();
 }
 
-function applyStationInput(revertIfUnknown) {
-  const id = stationIds.get(stationInput.value.trim().toLowerCase());
-  if (!id) {
-    if (revertIfUnknown) stationInput.value = board ? board.station : "";
-    return;
-  }
-  if (id === stationId) return;
-  stationId = id;
+// Applies a stop picked from the menu (an item from /api/stops).
+function applyChoice(item) {
+  if (item.id === stationId) return;
+  stationId = item.id;
   board = null;
   render();
   const url = new URL(location.href);
-  url.searchParams.set("station", id);
+  url.searchParams.delete("station");  // legacy parameter
+  url.searchParams.set("stop", item.id);
   history.replaceState(null, "", url);
   load();
 }
 
-async function loadStations() {
+// The native datalist popup is misplaced inside the scaled stage, so the menu is drawn in the page.
+// Results come from the server (/api/stops), as there are far too many bus stops to preload.
+let menuItems = [];  // [{id, name, code, mode}]
+let menuIndex = -1;
+let menuRequest = 0;  // ignores out-of-order search responses
+let menuTimer = null;
+let pendingChoice = null;
+
+async function fetchMenu() {
+  const q = stationInput.value.trim();
+  const mine = ++menuRequest;
   try {
-    const res = await fetch("/api/stations");
+    // An empty box lists every train station, as before; a query searches trains and buses.
+    const res = await fetch(`/api/stops?q=${encodeURIComponent(q)}&limit=${q ? 40 : 200}`);
     if (!res.ok) return;
     const data = await res.json();
-    for (const s of data.stations) {
-      stationIds.set(s.name.toLowerCase(), s.id);
-      stationNames.push(s.name);
-    }
+    if (mine !== menuRequest) return;
+    menuItems = data.stops;
   } catch {
-    // the sign still works without the search box
+    return;  // the sign still works without the search box
   }
+  renderMenu();
 }
 
-// The native datalist popup is misplaced inside the scaled stage, so the menu is drawn in the page.
-const stationNames = [];
-let menuItems = [];
-let menuIndex = -1;
-
-function showMenu() {
-  const q = stationInput.value.trim().toLowerCase();
-  menuItems = stationNames.filter((n) => n.toLowerCase().includes(q));
+function renderMenu() {
   menuIndex = -1;
-  stationMenu.replaceChildren(...menuItems.map((name) => {
+  stationMenu.replaceChildren(...menuItems.map((item, i) => {
     const li = document.createElement("li");
-    li.textContent = name;
+    li.dataset.i = i;
+    const tag = document.createElement("span");
+    tag.className = `tag ${item.mode}`;
+    tag.textContent = item.mode === "bus" ? "Bus" : "Train";
+    li.append(tag, item.name);
+    if (item.code) {
+      const code = document.createElement("span");
+      code.className = "code";
+      code.textContent = item.code;
+      li.append(code);
+    }
     return li;
   }));
   stationMenu.hidden = menuItems.length === 0;
+}
+
+function showMenu() {
+  clearTimeout(menuTimer);
+  menuTimer = setTimeout(fetchMenu, 120);
 }
 
 function highlight(i) {
@@ -215,28 +236,38 @@ function highlight(i) {
   li?.scrollIntoView({ block: "nearest" });
 }
 
-function chooseStation(name) {
-  stationInput.value = name;
+function chooseStation(item) {
+  pendingChoice = item;
   stationInput.blur();
 }
 
 // Keep focus in the input while the menu is clicked so blur does not close it first.
 stationMenu.addEventListener("mousedown", (e) => e.preventDefault());
 stationMenu.addEventListener("click", (e) => {
-  if (e.target.tagName === "LI") chooseStation(e.target.textContent);
+  const li = e.target.closest("li");
+  if (li) chooseStation(menuItems[Number(li.dataset.i)]);
 });
 
-stationInput.addEventListener("focus", () => { stationInput.value = ""; showMenu(); });
-stationInput.addEventListener("blur", () => { stationMenu.hidden = true; applyStationInput(true); });
+stationInput.addEventListener("focus", () => { stationInput.value = ""; fetchMenu(); });
+stationInput.addEventListener("blur", () => {
+  clearTimeout(menuTimer);
+  menuRequest++;  // drop any search still in flight
+  stationMenu.hidden = true;
+  const choice = pendingChoice;
+  pendingChoice = null;
+  if (choice) applyChoice(choice);
+  stationInput.value = choice ? choice.name : board ? board.station : "";
+});
 stationInput.addEventListener("input", showMenu);
 stationInput.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
+    if (!menuItems.length) return;
     const step = e.key === "ArrowDown" ? 1 : -1;
     highlight((menuIndex + step + menuItems.length) % menuItems.length);
   } else if (e.key === "Enter") {
     const typed = stationInput.value.trim().toLowerCase();
-    const exact = menuItems.find((n) => n.toLowerCase() === typed);
+    const exact = menuItems.find((n) => n.name.toLowerCase() === typed || n.code === typed);
     const pick = menuItems[menuIndex] ?? exact ?? menuItems[0];
     if (pick) chooseStation(pick); else stationInput.blur();
   } else if (e.key === "Escape") {
@@ -255,4 +286,3 @@ fitStage();
 tickClock();
 setInterval(() => { tickClock(); updateCountdowns(); }, 1000);
 load().then(scheduleNext);
-loadStations();

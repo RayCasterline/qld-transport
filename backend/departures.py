@@ -1,4 +1,4 @@
-"""Realtime overlay and departure board construction for a station."""
+"""Realtime overlay and departure board construction for a rail station or bus stop."""
 from __future__ import annotations
 
 import json
@@ -6,22 +6,25 @@ import logging
 import math
 import threading
 import time
+from bisect import bisect_left, bisect_right
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
 from google.transit import gtfs_realtime_pb2
 
-from .gtfs_static import StaticIndex, TripStop
+from .gtfs_static import BUS, TRAIN, StaticIndex, TripStop
 from .stock import is_ngr, is_three_car
 
 log = logging.getLogger(__name__)
 
-RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Rail"
+# The combined SEQ feed covers bus, ferry, train and tram. (Previously only .../TripUpdates/Rail.)
+RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates"
 POLL_INTERVAL_S = 60
 STALE_AFTER_S = 5 * 60
 ROWS_PER_SECTION = 3
 CITY_ROWS = 6  # Roma Street shows one list instead of two sections
+BUS_ROWS = 6  # bus stops show one chronological list
 # The 7th line of the Roma Street board is reserved for a message; they take turns each minute.
 CITY_MESSAGES_PATH = Path(__file__).with_name("city_messages.json")
 MESSAGE_ROTATE_S = 60
@@ -56,6 +59,10 @@ ROUTE_COLOR_OVERRIDES = {"SHSH": T4_BLUE}
 # Section titles as shown on the physical sign, by station: (inbound, outbound).
 SECTION_TITLES = {"Northgate": ("City & South/West", "North")}
 DEFAULT_SECTION_TITLES = ("City", "Outbound")
+
+# Buses share one colour: a teal that no rail line uses (rail is green, blues, red, gold, purple
+# and grey), and that keeps white text legible (contrast against white is about 4.9:1).
+BUS_COLOR = "#007C89"
 
 # Whether a trip is an NGR comes from backend/stock.py (run-code rule + trainspotter sightings).
 
@@ -102,7 +109,8 @@ class RealtimeCache:
 
     def get(self, trip_id: str, start_date: str):
         with self._lock:
-            return self._trips.get((trip_id, start_date))
+            # Some feeds omit start_date; fall back to a trip_id-only match.
+            return self._trips.get((trip_id, start_date)) or self._trips.get((trip_id, ""))
 
     @property
     def stale(self) -> bool:
@@ -127,10 +135,14 @@ def _apply_realtime(trip: TripStop, scheduled: int, tu, platforms) -> tuple[int,
     actual, stop_id = scheduled, trip.stop_id
     before_delay = None
     for stu in tu.stop_time_update:
-        if stu.stop_id in platforms:
+        # Bus feeds may identify a stop by stop_sequence only.
+        at_stop = stu.stop_id in platforms or (
+            not stu.stop_id and stu.stop_sequence and stu.stop_sequence == trip.stop_sequence
+        )
+        if at_stop:
             if stu.schedule_relationship == SKIPPED:
                 return scheduled, stop_id, True
-            stop_id = stu.stop_id
+            stop_id = stu.stop_id or stop_id
             if stu.departure.HasField("time") and stu.departure.time > 0:
                 return stu.departure.time, stop_id, False
             delay = _delay_of(stu)
@@ -165,8 +177,15 @@ def _fmt_time(epoch: int) -> str:
 
 
 def build_board(
-    index: StaticIndex, rt: RealtimeCache, station_id: str, now: float | None = None
+    index: StaticIndex,
+    rt: RealtimeCache,
+    station_id: str,
+    now: float | None = None,
+    mode: str | None = None,
 ) -> dict:
+    """Departure board for a rail station or a bus stop (`mode` only matters if an id is both)."""
+    if index.mode_of(station_id, mode) == BUS:
+        return build_bus_board(index, rt, station_id, now)
     now = now if now is not None else time.time()
     now_dt = datetime.fromtimestamp(now, BRISBANE)
     view = index.station_view(station_id)
@@ -215,6 +234,10 @@ def build_board(
         "realtime_timestamp": rt.feed_timestamp,
         "realtime_stale": rt.stale,
         "message": "",
+        "mode": TRAIN,
+        "kind_label": "Station",
+        "platform_heading": "Platform",
+        "stop_code": "",
     }
     if station_id == index.city_id:
         # Every train leaves the city, so inbound/outbound is meaningless: one longer list.
@@ -238,3 +261,65 @@ def build_board(
         outbound=top(sections[False]),
     )
     return board
+
+
+def build_bus_board(
+    index: StaticIndex, rt: RealtimeCache, stop_id: str, now: float | None = None
+) -> dict:
+    """One chronological list of the next buses at a stop (or at every bay of a busway station)."""
+    now = now if now is not None else time.time()
+    now_dt = datetime.fromtimestamp(now, BRISBANE)
+    view = index.bus_view(stop_id)
+    platforms = view.station.platforms  # bay stop_id -> label (the stop code)
+    rows: list[dict] = []
+
+    for day in (now_dt.date() - timedelta(days=1), now_dt.date()):
+        services = index.active_services(day)
+        midnight = int(datetime(day.year, day.month, day.day, tzinfo=BRISBANE).timestamp())
+        start_date = day.strftime("%Y%m%d")
+        # Calls are sorted by time, so bisect to the window instead of scanning the whole day.
+        lo = bisect_left(view.deps, int(now - 3600) - midnight)
+        hi = bisect_right(view.deps, int(now + LOOKAHEAD_S) - midnight)
+        for call in view.calls[lo:hi]:
+            if call.is_last or call.service_id not in services:
+                continue
+            scheduled = midnight + call.dep_seconds
+            tu = rt.get(call.trip_id, start_date)
+            actual, bay, excluded = _apply_realtime(call, scheduled, tu, platforms)
+            if excluded or actual < now or actual > now + LOOKAHEAD_S:
+                continue
+            rows.append(
+                {
+                    "scheduled": _fmt_time(scheduled),
+                    "destination": call.headsign or call.route_long,
+                    "express": False,
+                    "ngr": False,
+                    "three_car": False,
+                    "platform": platforms.get(bay, "-"),
+                    "departs_epoch": actual,
+                    "minutes": math.floor((actual - now) / 60),
+                    "route": call.route_short,
+                    "color": BUS_COLOR,
+                    "realtime": tu is not None,
+                }
+            )
+
+    rows.sort(key=lambda r: r["departs_epoch"])
+    return {
+        "now_epoch": int(now),
+        "station_id": view.station.id,
+        "station": view.station.name,
+        "realtime_timestamp": rt.feed_timestamp,
+        "realtime_stale": rt.stale,
+        "message": "",
+        "mode": BUS,
+        "kind_label": "Bus Stop",
+        "platform_heading": "Stop",
+        "stop_code": view.station.code,
+        "title": f"Next (1-{BUS_ROWS}) Buses",
+        "single_section": True,
+        "inbound_heading": "Service",
+        "outbound_heading": "",
+        "inbound": rows[:BUS_ROWS],
+        "outbound": [],
+    }
