@@ -307,7 +307,9 @@ function wipeTo(change) {
     copy.querySelector("#clock")?.setAttribute("data-clock", "");
     layer.appendChild(copy);
   }
-  for (const el of layer.querySelectorAll("[id]")) el.removeAttribute("id");
+  // The copy keeps its ids: most of the layout rules are keyed by id (#clock, #title, #route,
+  // #message...), so without them the outgoing screen would reflow as the wipe starts. The
+  // originals come first in the document, so getElementById/querySelector still find them.
   const line = document.createElement("div");
   line.className = "wipe-line";
   layer.appendChild(line);
