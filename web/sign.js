@@ -41,7 +41,10 @@ function fitStage() {
 
 function tickClock() {
   // "5:30:39 pm" -> "5:30:39"
-  clockEl.textContent = clockFmt.format(new Date()).replace(/\s?[ap]m$/i, "");
+  const text = clockFmt.format(new Date()).replace(/\s?[ap]m$/i, "");
+  clockEl.textContent = text;
+  // The outgoing screen shown during a wipe keeps ticking too.
+  for (const el of document.querySelectorAll(".wipe [data-clock]")) el.textContent = text;
 }
 
 function minutesText(departsEpoch) {
@@ -223,11 +226,11 @@ function render() {
 
 // Countdowns follow the local clock between fetches.
 function updateCountdowns() {
-  for (const el of document.querySelectorAll(".row")) {
-    el.querySelector(".minutes").textContent = minutesText(Number(el.dataset.departs));
+  // Includes the copies of the outgoing screen shown during a wipe.
+  for (const el of document.querySelectorAll(".row, .route-row")) {
+    const minutes = el.querySelector(".minutes");
+    if (minutes && el.dataset.departs) minutes.textContent = minutesText(Number(el.dataset.departs));
   }
-  const routeRow = routeEl.querySelector(".route-row");
-  if (!routeEl.hidden) routeRow.querySelector(".minutes").textContent = minutesText(Number(routeRow.dataset.departs));
 }
 
 async function load() {
@@ -291,6 +294,7 @@ function wipeTo(change) {
     if (child.classList.contains("wipe")) continue;
     const copy = child.cloneNode(true);
     copy.querySelector("#pickers")?.remove();
+    copy.querySelector("#clock")?.setAttribute("data-clock", "");
     layer.appendChild(copy);
   }
   for (const el of layer.querySelectorAll("[id]")) el.removeAttribute("id");
