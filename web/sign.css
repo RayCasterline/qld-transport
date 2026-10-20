@@ -130,6 +130,24 @@ section {
 .ngr .cut { fill: var(--row); }
 .ngr .label { fill: #e0e0e6; font: 700 118px "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
 
+/* Shown in the middle of the screen when the station has no upcoming services. */
+#no-services {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 80px;
+  line-height: 1.25;
+  padding: 0 120px;
+  pointer-events: none;
+}
+#no-services[hidden] { display: none; }
+
 /* Reserved 7th line (below six rows) on single-list boards. */
 #message {
   position: absolute;

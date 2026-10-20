@@ -8,6 +8,7 @@ const stationInput = document.getElementById("station-input");
 const stationList = document.getElementById("station-list");
 const messageEl = document.getElementById("message");
 const messageText = messageEl.firstElementChild;
+const noServicesEl = document.getElementById("no-services");
 const ngrTemplate = document.getElementById("ngr-icon");
 const MESSAGE_SPEED = 160; // px per second, in the 1920px design canvas
 let messageShown = "";
@@ -111,6 +112,7 @@ function setMessage(text) {
 }
 
 function render() {
+  messageEl.hidden = false;  // must be laid out for setMessage to measure it
   setMessage(board ? board.message : "");
   renderSection("inbound", board ? board.inbound : []);
   renderSection("outbound", board ? board.outbound : []);
@@ -121,6 +123,12 @@ function render() {
     document.querySelector("#outbound .name").textContent = board.outbound_heading;
     document.title = `${board.station} Station`;
     if (document.activeElement !== stationInput) stationInput.value = board.station;
+    // No upcoming services: replace the lists with a message in the middle of the screen.
+    const none = board.inbound.length === 0 && board.outbound.length === 0;
+    noServicesEl.hidden = !none;
+    document.getElementById("inbound").hidden = none;
+    if (none) document.getElementById("outbound").hidden = true;
+    messageEl.hidden = none;
   }
   renderStatus();
 }

@@ -20,7 +20,7 @@ POLL_INTERVAL_S = 60
 STALE_AFTER_S = 5 * 60
 ROWS_PER_SECTION = 3
 CITY_ROWS = 6  # Roma Street shows one list instead of two sections
-# The 7th line of the Roma Street board is reserved for a message.
+# The 7th line of the Roma Street board is reserved for a scrolling message; no other board has one.
 CITY_MESSAGE = "Supervise Children at all Times to Ensure the Safety of your Children"
 LOOKAHEAD_S = 4 * 3600
 
