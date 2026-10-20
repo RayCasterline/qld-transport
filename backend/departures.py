@@ -1,17 +1,19 @@
 """Realtime overlay and departure board construction for a station."""
 from __future__ import annotations
 
+import json
 import logging
 import math
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import requests
 from google.transit import gtfs_realtime_pb2
 
 from .gtfs_static import StaticIndex, TripStop
-from .stock import is_ngr
+from .stock import is_ngr, is_three_car
 
 log = logging.getLogger(__name__)
 
@@ -20,8 +22,10 @@ POLL_INTERVAL_S = 60
 STALE_AFTER_S = 5 * 60
 ROWS_PER_SECTION = 3
 CITY_ROWS = 6  # Roma Street shows one list instead of two sections
-# The 7th line of the Roma Street board is reserved for a scrolling message; no other board has one.
-CITY_MESSAGE = "Supervise Children at all Times to Ensure the Safety of your Children"
+# The 7th line of the Roma Street board is reserved for a scrolling message (no other board has
+# one); the messages take turns each minute.
+CITY_MESSAGES_PATH = Path(__file__).with_name("city_messages.json")
+MESSAGE_ROTATE_S = 60
 LOOKAHEAD_S = 4 * 3600
 
 # Queensland has no daylight saving, so a fixed UTC+10 offset is exact for Brisbane.
@@ -37,6 +41,9 @@ T4_BLUE = "#0101B6"        # Shorncliffe / Cleveland: deep blue sampled from a s
 FERNY_GROVE_RED = "#B81212"  # Ferny Grove / Beenleigh: a pure, slightly dark red (GTFS D53E45 is too muted)
 GOLD_COAST_GOLD = "#8C7A1E"  # Gold Coast / Airport: muted olive-gold as rendered on the sign
 DOOMBEN_PURPLE = "#9A56C2"  # Doomben: purple as rendered on the sign
+SHORT_WORKING_GRAY = "#888888"
+# Short workings that end at these stations are drawn gray whatever their line.
+GRAY_DESTINATIONS = {"Bowen Hills", "Roma Street"}
 # Keyed by the GTFS route_color of each route.
 MAP_COLORS = {
     "27855A": T1_GREEN,
@@ -57,6 +64,8 @@ DEFAULT_SECTION_TITLES = ("City", "Outbound")
 
 
 def _line_color(trip: TripStop) -> str:
+    if trip.headsign.removesuffix(" station") in GRAY_DESTINATIONS:
+        return SHORT_WORKING_GRAY
     return ROUTE_COLOR_OVERRIDES.get(trip.route_short) or MAP_COLORS.get(trip.color.upper()) or "#" + trip.color
 
 CANCELED = gtfs_realtime_pb2.TripDescriptor.CANCELED
@@ -144,13 +153,31 @@ def _destination(trip: TripStop) -> str:
     return name
 
 
+def _city_message(now: float) -> str:
+    try:
+        messages = json.loads(CITY_MESSAGES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        log.warning("Cannot read %s: %s", CITY_MESSAGES_PATH.name, exc)
+        return ""
+    return messages[int(now // MESSAGE_ROTATE_S) % len(messages)] if messages else ""
+
+
+def _platform_sort_key(label: str) -> tuple[int, int, str]:
+    digits = "".join(c for c in label if c.isdigit())
+    return (0, int(digits), label) if digits else (1, 0, label)
+
+
 def _fmt_time(epoch: int) -> str:
     dt = datetime.fromtimestamp(epoch, BRISBANE)
     return f"{dt.hour % 12 or 12}:{dt.minute:02d}"
 
 
 def build_board(
-    index: StaticIndex, rt: RealtimeCache, station_id: str, now: float | None = None
+    index: StaticIndex,
+    rt: RealtimeCache,
+    station_id: str,
+    now: float | None = None,
+    platform: str | None = None,
 ) -> dict:
     now = now if now is not None else time.time()
     now_dt = datetime.fromtimestamp(now, BRISBANE)
@@ -180,7 +207,10 @@ def build_board(
                     "destination": _destination(trip),
                     "express": trip.express,
                     "ngr": is_ngr(trip.trip_id, trip.trip_id in index.ngr_barred),
+                    "three_car": is_three_car(trip.trip_id),
                     "platform": platforms.get(stop_id, "-"),
+                    "trip_id": trip.trip_id,
+                    "stop_sequence": trip.stop_sequence,
                     "departs_epoch": actual,
                     "minutes": math.floor((actual - now) / 60),
                     "route": trip.route_short,
@@ -199,7 +229,33 @@ def build_board(
         "realtime_timestamp": rt.feed_timestamp,
         "realtime_stale": rt.stale,
         "message": "",
+        "platforms": sorted(set(platforms.values()) - {"-"}, key=_platform_sort_key),
+        "platform": None,
     }
+    if platform is not None and platform in board["platforms"]:
+        # One platform: the next trains in the direction that platform serves (other platforms
+        # of the same direction included, as on the real sign). The city station and platforms
+        # used both ways have no single direction, so they list just that platform's trains.
+        directions = {t.inbound for t in view.trips if platforms.get(t.stop_id) == platform}
+        if station_id == index.city_id or len(directions) != 1:
+            rows = [r for r in sections[True] + sections[False] if r["platform"] == platform]
+        else:
+            rows = sections[directions.pop()]
+        board.update(
+            platform=platform,
+            title=f"Next {CITY_ROWS} Trains - Platform {platform}",
+            route_title=f"Platform {platform}",
+            single_section=True,
+            inbound_heading="Service",
+            outbound_heading="",
+            inbound=top(rows, CITY_ROWS),
+            outbound=[],
+        )
+        for row in board["inbound"]:
+            row["stops"] = index.route_stops(row["trip_id"], row["stop_sequence"])
+        if station_id == index.city_id:
+            board["message"] = _city_message(now)
+        return board
     if station_id == index.city_id:
         # Every train leaves the city, so inbound/outbound is meaningless: one longer list.
         board.update(
@@ -207,7 +263,7 @@ def build_board(
             single_section=True,
             inbound_heading="Service",
             outbound_heading="",
-            message=CITY_MESSAGE,
+            message=_city_message(now),
             inbound=top(sections[True] + sections[False], CITY_ROWS),
             outbound=[],
         )

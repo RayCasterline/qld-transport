@@ -1,5 +1,5 @@
 """Entry point: python -m backend [--station NAME] [--port N] [--host H] [--show-attribution]
-[--infer-ngr]"""
+[--no-infer-ngr]"""
 import argparse
 import socket
 import sys
@@ -27,10 +27,11 @@ def main() -> None:
         help="show the TransLink data attribution / licence line at the bottom of the sign (hidden by default)",
     )
     parser.add_argument(
-        "--infer-ngr",
-        action="store_true",
-        help="also guess NGR from the run code (D prefix) where there are no sightings; by default only "
-             "services with trainspotter sightings in backend/stock_sightings.csv show the NGR icon",
+        "--no-infer-ngr",
+        dest="infer_ngr",
+        action="store_false",
+        help="do not guess stock from the run code (D = NGR, J = 3 car); only services with "
+             "sightings in backend/stock_sightings.csv show a stock icon",
     )
     args = parser.parse_args()
     if _port_in_use(args.host, args.port):

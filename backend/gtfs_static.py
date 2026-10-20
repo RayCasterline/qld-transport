@@ -219,6 +219,34 @@ class StaticIndex:
             )
         return StationView(station, trips)
 
+    def route_stops(self, trip_id: str, stop_sequence: int) -> list[dict]:
+        """Stations a trip calls at after `stop_sequence`; `express` marks a leg that skips stations."""
+        cache = self.__dict__
+        if "_trips_by_id" not in cache:
+            cache["_trips_by_id"] = {t.trip_id: t for t in self.trips}
+            # (a, b) is a skip leg if any trip calls at a then b with something in between.
+            skips: set[tuple[str, str]] = set()
+            for pattern in {tuple(self.stop_station[s[1]] for s in t.stops) for t in self.trips}:
+                for i in range(len(pattern)):
+                    for j in range(i + 2, len(pattern)):
+                        skips.add((pattern[i], pattern[j]))
+            cache["_skip_legs"] = skips
+        trip = cache["_trips_by_id"].get(trip_id)
+        if trip is None:
+            return []
+        sequence = [self.stop_station[s[1]] for s in trip.stops]
+        start = next((i for i, s in enumerate(trip.stops) if s[0] == stop_sequence), None)
+        if start is None:
+            return []
+        stops: list[dict] = []
+        prev_skipped = False
+        for i in range(start + 1, len(sequence)):
+            skipped = (sequence[i - 1], sequence[i]) in cache["_skip_legs"]
+            # Only the first stop of a run of skipping legs is annotated, as on the real sign.
+            stops.append({"name": self.stations[sequence[i]].name, "express": skipped and not prev_skipped})
+            prev_skipped = skipped
+        return stops
+
     def active_services(self, day: date) -> set[str]:
         ymd = day.strftime("%Y%m%d")
         weekday = day.strftime("%A").lower()
