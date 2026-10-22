@@ -7,14 +7,23 @@
   <link rel="stylesheet" href="sign.css">
 </head>
 <body>
+  <div id="banner" aria-live="polite"></div>
   <div id="stage">
     <header>
       <div id="clock">--:--:--</div>
       <div id="title">Next 3 Inbound and Outbound Trains</div>
-      <div id="station-picker">
-        <input id="station-input" placeholder="Search station or bus stop" role="combobox"
-               aria-controls="station-menu" autocomplete="off" spellcheck="false" aria-label="Station or bus stop">
-        <ul id="station-menu" role="listbox" hidden></ul>
+      <div id="route-departs" hidden>Departs</div>
+      <div id="pickers">
+        <div id="station-picker">
+          <input id="station-input" placeholder="Search station or bus stop" role="combobox"
+                 aria-controls="station-menu" autocomplete="off" spellcheck="false" aria-label="Station or bus stop">
+          <ul id="station-menu" role="listbox" hidden></ul>
+        </div>
+        <div id="platform-picker" hidden>
+          <button id="platform-button" type="button" aria-haspopup="listbox"
+                  aria-controls="platform-menu" aria-label="Platform" title="Platform">-</button>
+          <ul id="platform-menu" role="listbox" hidden></ul>
+        </div>
       </div>
     </header>
 
@@ -36,7 +45,15 @@
       <div class="rows"></div>
     </section>
 
+    <section id="route" hidden>
+      <div class="route-body">
+        <div class="route-row"></div>
+        <div class="stops"></div>
+      </div>
+    </section>
+
     <div id="message"><div class="track"></div></div>
+    <div id="no-services" hidden>No scheduled services from this platform</div>
     <footer id="status"></footer>
   </div>
 

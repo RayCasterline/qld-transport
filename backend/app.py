@@ -99,9 +99,8 @@ def stops(q: str = "", mode: str | None = None, limit: int = 20) -> dict:
 
 
 @app.get("/api/departures")
-def departures(
-    stop: str | None = None, station: str | None = None, mode: str | None = None
-) -> dict:
+def departures(stop: str | None = None, station: str | None = None, mode: str | None = None,
+platform: str | None = None) -> dict:
     """Departure board. `stop` (id, bus stop code or name) wins over the older `station`."""
     index = state["index"]
     if mode not in (None, "train", "bus"):
@@ -110,7 +109,7 @@ def departures(
     place_id = index.find_place(query, mode) if query else state["default_station"]
     if place_id is None:
         raise HTTPException(status_code=404, detail=f"Unknown station or stop: {query}")
-    board = build_board(index, rt_cache, place_id, mode=mode)
+    board = build_board(index, rt_cache, place_id, mode=mode, platform=platform)
     board["show_attribution"] = settings["show_attribution"]
     return board
 

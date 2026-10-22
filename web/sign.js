@@ -4,13 +4,23 @@ const TZ = "Australia/Brisbane";
 const clockEl = document.getElementById("clock");
 const statusEl = document.getElementById("status");
 const stage = document.getElementById("stage");
+const bannerEl = document.getElementById("banner");
 const stationInput = document.getElementById("station-input");
 const stationMenu = document.getElementById("station-menu");
+const platformPicker = document.getElementById("platform-picker");
+const platformButton = document.getElementById("platform-button");
+const platformMenu = document.getElementById("platform-menu");
 const messageEl = document.getElementById("message");
 const messageText = messageEl.firstElementChild;
+const noServicesEl = document.getElementById("no-services");
 const ngrTemplate = document.getElementById("ngr-icon");
 const threeCarTemplate = document.getElementById("three-car-icon");
 const airportTemplate = document.getElementById("airport-icon");
+const routeEl = document.getElementById("route");
+const ROUTE_SWITCH_MS = 20000; // platform boards alternate between the list and the next train's stops
+const WIPE_MS = 2000;
+let routeView = false;
+let viewSince = Date.now();
 const MESSAGE_SPEED = 160; // px per second, in the 1920px design canvas
 let messageShown = "";
 
@@ -19,21 +29,32 @@ let fetchOk = false;
 // null = server default. ?stop= takes an id, bus stop code or name; ?station= is the older form.
 const startParams = new URLSearchParams(location.search);
 let stationId = startParams.get("stop") ?? startParams.get("station");
+let platform = startParams.get("platform"); // null = all platforms
 
 const clockFmt = new Intl.DateTimeFormat("en-AU", {
   timeZone: TZ, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
 });
 
 function fitStage() {
-  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  // The sign is scaled into the space left under the banner.
+  const top = bannerEl.offsetHeight;
+  const s = Math.min(window.innerWidth / 1920, (window.innerHeight - top) / 1080);
   stage.style.transform = `scale(${s})`;
   stage.style.left = `${(window.innerWidth - 1920 * s) / 2}px`;
-  stage.style.top = `${(window.innerHeight - 1080 * s) / 2}px`;
+  stage.style.top = `${top + (window.innerHeight - top - 1080 * s) / 2}px`;
+}
+
+function setBanner(name) {
+  bannerEl.textContent = name;
+  bannerEl.title = name;  // full name on hover if it is clipped
 }
 
 function tickClock() {
   // "5:30:39 pm" -> "5:30:39"
-  clockEl.textContent = clockFmt.format(new Date()).replace(/\s?[ap]m$/i, "");
+  const text = clockFmt.format(new Date()).replace(/\s?[ap]m$/i, "");
+  clockEl.textContent = text;
+  // The outgoing screen shown during a wipe keeps ticking too.
+  for (const el of document.querySelectorAll(".wipe [data-clock]")) el.textContent = text;
 }
 
 function minutesText(departsEpoch) {
@@ -75,6 +96,75 @@ function renderSection(id, rows) {
       }
     }
     container.appendChild(el);
+  }
+}
+
+function stockIcon(r) {
+  const template = r.three_car ? threeCarTemplate : r.ngr ? ngrTemplate : null;
+  return template ? template.content.firstElementChild.cloneNode(true) : null;
+}
+
+function renderRoute(r) {
+  const body = routeEl.querySelector(".route-body");
+  body.style.background = r.color;
+  body.style.setProperty("--row", r.color);
+  const row = routeEl.querySelector(".route-row");
+  row.dataset.departs = r.departs_epoch;
+  const svc = document.createElement("span");
+  svc.className = "svc";
+  svc.textContent = `${r.scheduled} to ${r.destination}`;
+  const minutes = document.createElement("span");
+  minutes.className = "minutes";
+  minutes.textContent = minutesText(r.departs_epoch);
+  row.replaceChildren(svc, ...[stockIcon(r)].filter(Boolean), minutes);
+
+  const stops = routeEl.querySelector(".stops");
+  stops.replaceChildren(...r.stops.map((s) => {
+    const div = document.createElement("div");
+    div.className = "stop";
+    div.append(s.name);
+    if (s.express) {
+      const note = document.createElement("span");
+      note.className = "exp-note";
+      note.textContent = "express";
+      div.appendChild(note);
+    }
+    return div;
+  }));
+  layoutStops(stops, r.stops);
+}
+
+const STOPS_WIDTH = 1832;   // usable width of the stops block in the 1920px canvas
+const STOPS_HEIGHT = 620;   // usable height below the service row
+const STOPS_GAP = 40;
+const STOPS_MAX_LINE = 80;  // tallest line, used when there are few stops
+const STOPS_PREFERRED_LINE = 62;  // two columns are used only if they are at least this large
+const STOPS_FONT_RATIO = 0.76;
+const measureCtx = document.createElement("canvas").getContext("2d");
+
+// Two columns with bigger text when the stops fit that way, otherwise three columns.
+function layoutStops(stops, list) {
+  measureCtx.font = `700 100px ${getComputedStyle(stops).fontFamily}`;
+  const widest = Math.max(1, ...list.map((s) => measureCtx.measureText(s.name).width)) / 100;
+  const lines = list.length + list.filter((s) => s.express).length || 1;
+  const fit = (cols) => {
+    const colWidth = (STOPS_WIDTH - STOPS_GAP * (cols - 1)) / cols;
+    return Math.min(
+      STOPS_MAX_LINE,
+      STOPS_HEIGHT / Math.ceil(lines / cols),
+      colWidth / widest / STOPS_FONT_RATIO,
+    );
+  };
+  const twoCols = fit(2) >= STOPS_PREFERRED_LINE;
+  const cols = twoCols ? 2 : 3;
+  let lineHeight = Math.floor(fit(cols));
+  stops.style.columnCount = cols;
+  for (;;) {
+    stops.style.fontSize = `${lineHeight * STOPS_FONT_RATIO}px`;
+    stops.style.lineHeight = `${lineHeight}px`;
+    // Columns that do not balance evenly (a two-line stop kept together) can still overflow.
+    if (stops.offsetHeight - 36 <= STOPS_HEIGHT || lineHeight <= 24) break;
+    lineHeight -= 2;
   }
 }
 
@@ -121,44 +211,73 @@ function setMessage(text) {
 }
 
 function render() {
+  messageEl.hidden = false;  // must be laid out for setMessage to measure it
   setMessage(board ? board.message : "");
   renderSection("inbound", board ? board.inbound : []);
   renderSection("outbound", board ? board.outbound : []);
+  // The stops page follows the next train calling at the chosen platform, or else the next
+  // train in the list (a rarely used platform may have none in the coming hours).
+  const routeTrain = board && board.platform
+    ? board.inbound.find((r) => r.platform === board.platform) ?? board.inbound[0] : null;
+  const showRoute = Boolean(routeTrain && routeView);
+  routeEl.hidden = !showRoute;
+  document.getElementById("route-departs").hidden = !showRoute;
+  stage.classList.toggle("route-view", showRoute);
+  if (showRoute && !wiping) renderRoute(routeTrain);  // stops stay as they were when the wipe began
   if (board) {
-    document.getElementById("title").textContent = board.title;
-    document.getElementById("outbound").hidden = board.single_section;
+    document.getElementById("title").textContent = showRoute ? board.route_title : board.title;
+    document.getElementById("inbound").hidden = showRoute;
+    document.getElementById("outbound").hidden = showRoute || board.single_section;
     document.querySelector("#inbound .name").textContent = board.inbound_heading;
     document.querySelector("#outbound .name").textContent = board.outbound_heading;
     document.title = `${board.station} ${board.kind_label ?? "Station"}`;
+    setBanner(board.station);
     for (const el of document.querySelectorAll(".col-platform")) {
       el.textContent = board.platform_heading ?? "Platform";
     }
     if (document.activeElement !== stationInput) stationInput.value = board.station;
+    renderPlatformPicker();
+    // No upcoming services: replace the lists with a message in the middle of the screen.
+    const none = !showRoute && board.inbound.length === 0 && board.outbound.length === 0;
+    noServicesEl.hidden = !none;
+    if (none) {
+      document.getElementById("inbound").hidden = true;
+      document.getElementById("outbound").hidden = true;
+    }
+    messageEl.hidden = none;
   }
   renderStatus();
 }
 
 // Countdowns follow the local clock between fetches.
 function updateCountdowns() {
-  for (const el of document.querySelectorAll(".row")) {
-    el.querySelector(".minutes").textContent = minutesText(Number(el.dataset.departs));
+  // Includes the copies of the outgoing screen shown during a wipe.
+  for (const el of document.querySelectorAll(".row, .route-row")) {
+    const minutes = el.querySelector(".minutes");
+    if (minutes && el.dataset.departs) minutes.textContent = minutesText(Number(el.dataset.departs));
   }
 }
 
 async function load() {
   const requested = stationId;
+  const requestedPlatform = platform;
   try {
-    const query = requested ? `?stop=${encodeURIComponent(requested)}` : "";
+    const params = new URLSearchParams();
+    if (requested) params.set("stop", requested);
+    if (requestedPlatform) params.set("platform", requestedPlatform);
+    const query = params.size ? `?${params}` : "";
     const res = await fetch(`/api/departures${query}`, { cache: "no-store" });
     if (res.status === 404 && requested) {  // unknown station: fall back to the default
       stationId = null;
+      platform = null;
       return load();
     }
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
-    if (requested !== stationId) return;  // the user picked another station meanwhile
+    if (requested !== stationId || requestedPlatform !== platform) return;  // the user picked another meanwhile
     board = data;
     stationId = board.station_id;
+    platform = board.platform;  // null if the platform does not exist at this station
     fetchOk = true;
   } catch {
     fetchOk = false;
@@ -170,7 +289,10 @@ async function load() {
 function applyChoice(item) {
   if (item.id === stationId) return;
   stationId = item.id;
+  platform = null;  // platforms belong to the previous station
+  resetRouteView();
   board = null;
+  setBanner(item.name);
   render();
   const url = new URL(location.href);
   url.searchParams.delete("station");  // legacy parameter
@@ -186,6 +308,90 @@ let menuIndex = -1;
 let menuRequest = 0;  // ignores out-of-order search responses
 let menuTimer = null;
 let pendingChoice = null;
+
+// A copy of the outgoing screen is laid over the stage and shrunk away from the top by a thin
+// yellow line, so the incoming screen (rendered underneath) is revealed as the line moves down.
+let wiping = false;
+let wipeLayer = null;
+
+function cancelWipe() {
+  wipeLayer?.remove();
+  wipeLayer = null;
+  wiping = false;
+}
+
+function wipeTo(change) {
+  const layer = document.createElement("div");
+  layer.className = "wipe";
+  for (const child of stage.children) {
+    if (child.classList.contains("wipe")) continue;
+    const copy = child.cloneNode(true);
+    copy.querySelector("#pickers")?.remove();
+    copy.querySelector("#clock")?.setAttribute("data-clock", "");
+    layer.appendChild(copy);
+  }
+  // The copy keeps its ids: most of the layout rules are keyed by id (#clock, #title, #route,
+  // #message...), so without them the outgoing screen would reflow as the wipe starts. The
+  // originals come first in the document, so getElementById/querySelector still find them.
+  const line = document.createElement("div");
+  line.className = "wipe-line";
+  layer.appendChild(line);
+  stage.appendChild(layer);
+  change();
+  wiping = true;
+  wipeLayer = layer;
+  const done = () => {
+    if (wipeLayer !== layer) return;  // already finished or cancelled
+    cancelWipe();
+  };
+  layer.addEventListener("animationend", (e) => { if (e.target === layer) done(); });
+  setTimeout(done, WIPE_MS + 500);
+}
+
+function resetRouteView() {
+  cancelWipe();
+  routeView = false;
+  viewSince = Date.now();
+}
+
+function updateUrl() {
+  const url = new URL(location.href);
+  url.searchParams.delete("station");  // legacy parameter
+  url.searchParams.set("stop", stationId);
+  if (platform) url.searchParams.set("platform", platform); else url.searchParams.delete("platform");
+  history.replaceState(null, "", url);
+}
+
+function renderPlatformPicker() {
+  const platforms = board?.platforms ?? [];
+  platformPicker.hidden = platforms.length === 0;
+  platformButton.textContent = platform || "-";
+  platformMenu.replaceChildren(...[null, ...platforms].map((p) => {
+    const li = document.createElement("li");
+    li.dataset.platform = p ?? "";
+    li.textContent = p ?? "-";
+    return li;
+  }));
+}
+
+function choosePlatform(value) {
+  platformMenu.hidden = true;
+  platformButton.blur();
+  const next = value || null;
+  if (next === platform) return;
+  platform = next;
+  resetRouteView();
+  updateUrl();
+  load();
+}
+
+platformMenu.addEventListener("mousedown", (e) => e.preventDefault());
+platformMenu.addEventListener("click", (e) => {
+  if (e.target.tagName === "LI") choosePlatform(e.target.dataset.platform);
+});
+platformButton.addEventListener("click", () => { platformMenu.hidden = !platformMenu.hidden; });
+platformButton.addEventListener("blur", () => { platformMenu.hidden = true; });
+platformButton.addEventListener("keydown", (e) => { if (e.key === "Escape") platformButton.blur(); });
 
 async function fetchMenu() {
   const q = stationInput.value.trim();
@@ -211,7 +417,10 @@ function renderMenu() {
     const tag = document.createElement("span");
     tag.className = `tag ${item.mode}`;
     tag.textContent = item.mode === "bus" ? "Bus" : "Train";
-    li.append(tag, item.name);
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = item.name;
+    li.append(tag, label);
     if (item.code) {
       const code = document.createElement("span");
       code.className = "code";
@@ -281,8 +490,32 @@ function scheduleNext() {
   setTimeout(async () => { await load(); scheduleNext(); }, msToNextMinute + 2000);
 }
 
+// The pickers fade out when the mouse stops moving, so the sign looks clean on a wall display.
+const pickersEl = document.getElementById("pickers");
+const IDLE_MS = 3000;
+let idleTimer = null;
+function wake() {
+  pickersEl.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => pickersEl.classList.add("idle"), IDLE_MS);
+}
+window.addEventListener("mousemove", wake);
+window.addEventListener("mousedown", wake);
+wake();
+
 window.addEventListener("resize", fitStage);
 fitStage();
 tickClock();
-setInterval(() => { tickClock(); updateCountdowns(); }, 1000);
+setInterval(() => {
+  tickClock();
+  updateCountdowns();
+  if (board && board.platform && board.inbound.length
+      && Date.now() - viewSince >= ROUTE_SWITCH_MS) {
+    viewSince = Date.now() + WIPE_MS;
+    wipeTo(() => {
+      routeView = !routeView;
+      render();
+    });
+  }
+}, 1000);
 load().then(scheduleNext);

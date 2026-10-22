@@ -2,7 +2,26 @@
 
 A live departure board for any South East Queensland rail station or TransLink bus stop, built from the TransLink GTFS static and GTFS-realtime feeds. A FastAPI backend serves the sign page (`web/`) and a JSON API (`/api/stops`, `/api/departures`, and `/api/stations` for trains only). The default station is Northgate, styled after its real sign.
 
+## Features
+
+- Live departures from the TransLink GTFS-realtime feed (delays, cancellations, skipped stops, platform changes), falling back to the timetable if the feed is unavailable.
+- Searchable station picker; the choice is kept in the URL.
+- Line colours, express ("Exp") markers and "City & ..." destinations as on the real signs.
+- NGR (New Generation Rollingstock) and 3 CAR icons on services, plus an aeroplane icon on Airport services (see [Train icons](#train-icons)).
+- Roma Street single list of 6 trains with a scrolling message line that rotates through your own messages.
+- Platform view: limit the board to one platform and cycle to the stops of its next train.
+- A centred "No scheduled services from this platform" message when a station has nothing upcoming.
+- Scales to any screen size, so it can be left running full screen on a spare display.
+
 ## Examples
+
+Northgate, the default station, shows the next 3 trains to the city and the next 3 to the north, with NGR icons:
+
+![Northgate](docs/northgate.png)
+
+Albion shows the NGR icon, the 3 CAR icon (Doomben and city services) and the aeroplane after a Domestic Airport destination:
+
+![Albion](docs/albion.png)
 
 Roma Street shows a single list of the next 6 trains, with a scrolling message on the last line:
 
@@ -80,6 +99,8 @@ Add your own text to the list in `backend/city_messages.json`; it is a plain JSO
 
 The file is read on every request, so changes show up without restarting the server. The sign rotates through the messages in order, one per minute.
 
+The platform box next to the station box limits the board to one platform (`-` shows all). It then lists the next 6 trains in the direction that platform serves (so Northgate platform 3 also lists platform 1 trains; city platforms list only their own) and, every 20 seconds, switches to the stops of the next train calling at that platform, on its line colour (two columns with larger text when the stops fit, otherwise three), with a 2-second wipe (a thin yellow line moving down the screen) between the two pages. The choice is stored in the URL as `&platform=3`, and the API accepts `/api/departures?station=...&platform=3`. Both boxes fade out when the mouse has not moved for a few seconds.
+
 ### Options
 
 | Option | Default | Description |
@@ -104,7 +125,31 @@ python -m backend --host 0.0.0.0 --port 9000 --show-attribution
 uvicorn backend.app:app --port 8731
 ```
 
-This skips the `--stop`, `--station`, `--mode` and `--show-attribution` options.
+This skips the `--stop`, `--station`, `--mode`, `--show-attribution` and `--no-infer-ngr` options.
+
+## Train icons
+
+The GTFS feeds do not say what train runs a service, so the NGR and 3 CAR icons come from the run code and from trainspotter sightings in `backend/stock_sightings.csv`. Each row says "run code X was seen to be stock Y", where the run code is the end of the GTFS trip ID (e.g. `...-44306-D103` is run `D103`) and the stock is `NGR`, `3CAR`, `SMU`, `IMU`, `EMU`, `ICE` or `OTHER`.
+
+- Sightings always win. An exact run code needs 1 sighting; a glob such as `D1*` needs 2. The most specific pattern wins.
+- Without a sighting, a `D` run is guessed to be an NGR and a `J` run (Doomben, Rosewood-Ipswich) a 3-car set. `--no-infer-ngr` turns the guess off.
+- Trips calling at stations NGRs cannot serve (Ferny Grove line, west of Ipswich) are never shown as NGR.
+- Services to the Domestic and International Airport show an aeroplane icon after the destination.
+- The file is re-read when it changes, so edits apply without restarting.
+
+Manage sightings with `python -m backend.stock`:
+
+```bash
+python -m backend.stock add D880 NGR --source "platform photo"
+python -m backend.stock add "D1*" IMU --source "platform photo"
+
+# Turn the rows of a real sign photo into sightings (dry run unless --save)
+python -m backend.stock sign --station Northgate --date 2026-10-19 --time 17:30 \
+  '5:42 1 NGR Cleveland' '5:57 1 - Cleveland' --save
+
+# Compare sightings with the run-code guess and the feed
+python -m backend.stock check
+```
 
 ## Troubleshooting
 
